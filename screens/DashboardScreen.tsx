@@ -5,6 +5,8 @@ import type { AppNavigationProp, Note, NoteCategory, User } from '../types';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { getUser } from '../components/userStorage';
 import { getNotes, ensurePlaceholderNotes } from '../components/notesStorage';
+import { useAuth } from '../hooks/useAuth';
+import { getUserNotes } from '../supabaseNotes';
 
 const CATEGORIES: NoteCategory[] = ['Goals', 'Daily Journals', 'Game Day'];
 const CATEGORY_COLORS = {
@@ -16,14 +18,23 @@ const CATEGORY_COLORS = {
 const DashboardScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
   const isFocused = useIsFocused();
+  const { profile } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
-  const [user, setUserState] = useState<User | null>(null);
 
   useEffect(() => {
     const load = async () => {
-      setUserState(await getUser());
-      await ensurePlaceholderNotes();
-      setNotes(await getNotes());
+      try {
+        const supabaseNotes = await getUserNotes();
+        console.log('Fetched notes from Supabase:', supabaseNotes);
+        const mappedNotes = (supabaseNotes || []).map(n => ({
+          ...n,
+          pinned: n.pinned || false,
+          deleted: n.deleted || false,
+        }));
+        setNotes(mappedNotes);
+      } catch (e) {
+        setNotes([]);
+      }
     };
     if (isFocused) load();
   }, [isFocused]);
@@ -44,12 +55,12 @@ const DashboardScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {user?.avatar ? (
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          {profile?.avatar ? (
+            <Image source={{ uri: profile.avatar }} style={styles.avatar} />
           ) : (
             <View style={styles.avatar} />
           )}
-          <Text style={styles.helloText}>Hello, {user ? user.firstName : 'User'}</Text>
+          <Text style={styles.helloText}>Hello, {profile?.first_name ? profile.first_name : 'User'}</Text>
         </View>
         <TouchableOpacity onPress={handleSettings}>
           <Ionicons name="settings-outline" size={28} color="#fff" />

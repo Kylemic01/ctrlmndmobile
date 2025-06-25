@@ -4,6 +4,8 @@ import { RouteProp, useNavigation, useRoute, useIsFocused } from '@react-navigat
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import type { RootStackParamList, Note, NoteCategory, AppNavigationProp } from '../types';
 import { getNotes, addOrUpdateNote, deleteNote, pinNote } from '../components/notesStorage';
+import { addNote as addSupabaseNote, updateNote as updateSupabaseNote, Note as SupabaseNote, getUserNotes } from '../supabaseNotes';
+import { useAuth } from '../hooks/useAuth';
 
 const mockLoadNote = async (noteId: string): Promise<Note | null> => {
   // TODO: Replace with real storage logic
@@ -36,17 +38,36 @@ const NoteEditScreen = () => {
   const [selectedTime, setSelectedTime] = useState('8 min');
   const [selectedWant, setSelectedWant] = useState('Motivation');
   const [currentNoteId, setCurrentNoteId] = useState(noteId);
+  const { profile } = useAuth();
 
   useEffect(() => {
     const load = async () => {
+      console.log('Loading note, currentNoteId:', currentNoteId);
       if (currentNoteId) {
-        const notes = await getNotes();
-        const found = notes.find(n => n.id === currentNoteId);
-        if (found) {
-          setNote(found);
-          setTitle(found.title);
-          setContent(found.content);
-          setPinned(!!found.pinned);
+        // Fetch the note from Supabase by ID
+        try {
+          const notes = await getUserNotes();
+          const found = notes.find((n: any) => n.id === currentNoteId);
+          console.log('Loaded note from Supabase:', found);
+          if (found) {
+            setNote(found);
+            setTitle(found.title);
+            setContent(found.content);
+            setPinned(!!found.pinned);
+            setIsNew(false);
+          } else {
+            setNote(null);
+            setTitle('');
+            setContent('');
+            setPinned(false);
+            setIsNew(false);
+          }
+        } catch (e) {
+          console.log('Error loading note from Supabase:', e);
+          setNote(null);
+          setTitle('');
+          setContent('');
+          setPinned(false);
           setIsNew(false);
         }
       } else {
@@ -72,21 +93,47 @@ const NoteEditScreen = () => {
 
   const saveNote = async () => {
     if (title.trim() || content.trim()) {
-      let id = currentNoteId;
-      if (!id || !/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(id)) {
-        id = undefined;
+      if (!profile) {
+        console.log('No profile available when saving note');
+        return;
       }
-      const newNote: Note = {
-        id: id || '',
-        category: category!,
-        title,
-        content,
-        date: new Date().toISOString(),
-        pinned,
-      };
-      const savedId = await addOrUpdateNote(newNote);
-      if (!currentNoteId && savedId) {
-        setCurrentNoteId(savedId);
+      console.log('saveNote called, currentNoteId:', currentNoteId);
+      if (!currentNoteId) {
+        // New note
+        try {
+          const created = await addSupabaseNote({
+            user_id: profile.id,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            email: profile.email,
+            title,
+            content,
+            category: category!,
+          });
+          console.log('Created note result:', created);
+          if (created && created.id) {
+            setCurrentNoteId(created.id);
+            // Return early to avoid double-creation
+            return;
+          }
+        } catch (e) {
+          console.log('Error creating note:', e);
+        }
+      } else {
+        // Update existing note
+        try {
+          await updateSupabaseNote(currentNoteId, {
+            user_id: profile.id,
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            email: profile.email,
+            title,
+            content,
+            category: category!,
+          });
+        } catch (e) {
+          console.log('Error updating note:', e);
+        }
       }
     }
   };

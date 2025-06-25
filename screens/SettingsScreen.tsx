@@ -4,9 +4,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { AppNavigationProp, User } from '../types';
 import * as ImagePicker from 'expo-image-picker';
 import { getUser, setUser, clearUser } from '../components/userStorage';
+import { useAuth } from '../hooks/useAuth';
 
 const SettingsScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
+  const { profile } = useAuth();
   const [user, setUserState] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -14,22 +16,19 @@ const SettingsScreen = () => {
   const [avatar, setAvatar] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    getUser().then(u => {
-      if (u) {
-        setUserState(u);
-        setFirstName(u.firstName);
-        setLastName(u.lastName);
-        setEmail(u.email);
-        setAvatar(u.avatar);
-      } else {
-        setUserState(null);
-        setFirstName('');
-        setLastName('');
-        setEmail('');
-        setAvatar(undefined);
-      }
-    });
-  }, []);
+    if (profile) {
+      setUserState({
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        email: profile.email,
+        avatar: profile.avatar,
+      });
+      setFirstName(profile.first_name || '');
+      setLastName(profile.last_name || '');
+      setEmail(profile.email || '');
+      setAvatar(profile.avatar);
+    }
+  }, [profile]);
 
   const handleSave = async () => {
     if (!firstName || !lastName || !email) {
@@ -61,6 +60,12 @@ const SettingsScreen = () => {
         <Text style={styles.closeText}>Close</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Settings</Text>
+      {profile && (
+        <View style={styles.userInfoBox}>
+          <Text style={styles.userInfoText}>Full Name: <Text style={styles.userInfoValue}>{profile.first_name} {profile.last_name}</Text></Text>
+          <Text style={styles.userInfoText}>Email: <Text style={styles.userInfoValue}>{profile.email}</Text></Text>
+        </View>
+      )}
       <TouchableOpacity onPress={handlePickAvatar}>
         {avatar ? (
           <Image source={{ uri: avatar }} style={styles.avatar} />
@@ -69,9 +74,6 @@ const SettingsScreen = () => {
         )}
         <Text style={styles.avatarText}>Change Photo</Text>
       </TouchableOpacity>
-      <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholder="First Name" placeholderTextColor="#888" />
-      <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Last Name" placeholderTextColor="#888" />
-      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor="#888" autoCapitalize="none" />
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save</Text>
       </TouchableOpacity>
@@ -155,6 +157,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  userInfoBox: {
+    backgroundColor: '#232323',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    width: '100%',
+    alignItems: 'flex-start',
+  },
+  userInfoText: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  userInfoValue: {
+    color: '#ff8800',
+    fontWeight: 'bold',
   },
 });
 

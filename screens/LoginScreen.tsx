@@ -20,6 +20,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../supabase';
 import { ensureProfileRowExists } from '../components/userStorage';
+import { useAuth } from '../hooks/useAuth';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -36,6 +37,8 @@ const LoginScreen = () => {
     iosClientId: 'YOUR_IOS_CLIENT_ID',     // Replace with your iOS client ID
     androidClientId: 'YOUR_ANDROID_CLIENT_ID', // Replace with your Android client ID
   });
+
+  const { signIn, user, refreshProfile } = useAuth();
 
   useEffect(() => {
     if (response?.type === 'success') {
@@ -93,14 +96,13 @@ const LoginScreen = () => {
     }
 
     try {
-      // Login with Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error || !data.user) {
-        Alert.alert('Error', error?.message || 'Invalid email or password.');
-        return;
+      // Login with Supabase Auth and load profile
+      await signIn({ email, password });
+      // Get the user directly from Supabase after login
+      const { data: { user: supaUser } } = await supabase.auth.getUser();
+      if (supaUser && supaUser.id) {
+        await ensureProfileRowExists({ email });
+        await refreshProfile();
       }
       Alert.alert('Success', 'Logged in successfully!');
       navigation.navigate('Dashboard');

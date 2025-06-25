@@ -29,20 +29,34 @@ function useProvideAuth() {
 
   const fetchProfile = async (id: string) => {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single();
-    if (!error) setProfile(data);
+    if (!error && data) {
+      setProfile({
+        id: data.id,
+        email: data.email,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        avatar: data.avatar,
+      });
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user && user.id) {
+      await fetchProfile(user.id);
+    }
   };
 
   const signUp = async ({ email, password, first_name, last_name }: { email: string; password: string; first_name: string; last_name: string }) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error || !data.user) throw error || new Error('No user returned');
-    await supabase.from('profiles').insert({
+    await supabase.from('profiles').upsert({
       id: data.user.id,
       email,
       first_name,
       last_name,
     });
     await fetchProfile(data.user.id);
-    return data;
+    return { data, error };
   };
 
   const signIn = async ({ email, password }: { email: string; password: string }) => {
@@ -58,5 +72,5 @@ function useProvideAuth() {
     setProfile(null);
   };
 
-  return { user, profile, signUp, signIn, signOut };
+  return { user, profile, signUp, signIn, signOut, refreshProfile };
 } 

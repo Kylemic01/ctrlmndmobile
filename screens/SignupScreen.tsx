@@ -106,12 +106,19 @@ const SignupScreen = () => {
       return;
     }
     try {
-      await signUp({
+      const { data, error } = await signUp({
         email,
         password,
         first_name: firstName,
         last_name: lastName,
       });
+      console.log('Signup result:', data, error);
+      if (error || !data || !data.user) throw error || new Error('No user returned');
+      // Update the profile row with names
+      await supabase.from('profiles').update({
+        first_name: firstName,
+        last_name: lastName
+      }).eq('id', data.user.id);
       Alert.alert('Success', 'Account created successfully!');
       navigation.navigate('QuizIntro');
     } catch (error: any) {
