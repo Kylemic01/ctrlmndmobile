@@ -94,12 +94,14 @@ const NoteEditScreen = () => {
     return unsubscribe;
   }, [navigation, title, content, pinned, currentNoteId, category, saving]);
 
-  const saveNote = async () => {
+  // Save note, optionally navigate away (default: true)
+  const saveNote = async (shouldNavigateAway = true) => {
     if (saving) return;
     setSaving(true);
     if (title.trim() || content.trim()) {
       if (!profile) {
         console.log('No profile available when saving note');
+        setSaving(false);
         return;
       }
       console.log('saveNote called, currentNoteId:', currentNoteId);
@@ -118,13 +120,15 @@ const NoteEditScreen = () => {
           console.log('Created note result:', created);
           if (created && created.id) {
             setCurrentNoteId(created.id);
-            setTimeout(() => {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Dashboard' }],
-              });
-            }, 400);
-            return;
+            if (shouldNavigateAway) {
+              setTimeout(() => {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'Dashboard' }],
+                });
+              }, 400);
+              return;
+            }
           }
         } catch (e) {
           console.log('Error creating note:', e);
@@ -141,12 +145,14 @@ const NoteEditScreen = () => {
             category: category!,
             pinned,
           });
-          setTimeout(() => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Dashboard' }],
-            });
-          }, 400);
+          if (shouldNavigateAway) {
+            setTimeout(() => {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            }, 400);
+          }
         } catch (e) {
           console.log('Error updating note:', e);
         }
@@ -191,7 +197,7 @@ const NoteEditScreen = () => {
   };
 
   const handlePlay = async () => {
-    await saveNote();
+    await saveNote(false); // Do not navigate away when saving from play button
     setShowSheet(true);
   };
 
