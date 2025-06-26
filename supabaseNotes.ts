@@ -9,6 +9,7 @@ export type Note = {
   title: string;
   content: string;
   category: string;
+  pinned?: boolean;
   created_at?: string;
   updated_at?: string;
 };
@@ -22,13 +23,17 @@ export async function addNote(note: Omit<Note, 'id' | 'created_at' | 'updated_at
     title: note.title,
     content: note.content,
     category: note.category,
+    pinned: note.pinned ?? false,
   }).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function updateNote(noteId: string, updatedFields: Partial<Note>) {
-  const { data, error } = await supabase.from('notes').update(updatedFields).eq('id', noteId).select().single();
+  const { data, error } = await supabase.from('notes').update({
+    ...updatedFields,
+    pinned: updatedFields.pinned ?? undefined,
+  }).eq('id', noteId).select().single();
   if (error) throw error;
   return data;
 }

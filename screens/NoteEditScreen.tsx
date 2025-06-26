@@ -3,8 +3,7 @@ import { View, Text, TextInput, Button, StyleSheet, ScrollView, TouchableOpacity
 import { RouteProp, useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import type { RootStackParamList, Note, NoteCategory, AppNavigationProp } from '../types';
-import { getNotes, addOrUpdateNote, deleteNote, pinNote } from '../components/notesStorage';
-import { addNote as addSupabaseNote, updateNote as updateSupabaseNote, Note as SupabaseNote, getUserNotes } from '../supabaseNotes';
+import { addNote as addSupabaseNote, updateNote as updateSupabaseNote, Note as SupabaseNote, getUserNotes, deleteNote as supabaseDeleteNote } from '../supabaseNotes';
 import { useAuth } from '../hooks/useAuth';
 
 const mockLoadNote = async (noteId: string): Promise<Note | null> => {
@@ -39,6 +38,8 @@ const NoteEditScreen = () => {
   const [selectedWant, setSelectedWant] = useState('Motivation');
   const [currentNoteId, setCurrentNoteId] = useState(noteId);
   const { profile } = useAuth();
+  const [saving, setSaving] = useState(false);
+  const saveTriggeredRef = useRef(false);
 
   useEffect(() => {
     const load = async () => {
@@ -86,12 +87,16 @@ const NoteEditScreen = () => {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', async (e) => {
-      await saveNote();
+      if (saveTriggeredRef.current) return;
+      saveTriggeredRef.current = true;
+      if (!saving) await saveNote();
     });
     return unsubscribe;
-  }, [navigation, title, content, pinned, currentNoteId, category]);
+  }, [navigation, title, content, pinned, currentNoteId, category, saving]);
 
   const saveNote = async () => {
+    if (saving) return;
+    setSaving(true);
     if (title.trim() || content.trim()) {
       if (!profile) {
         console.log('No profile available when saving note');
@@ -104,16 +109,21 @@ const NoteEditScreen = () => {
           const created = await addSupabaseNote({
             user_id: profile.id,
             first_name: profile.first_name,
-            last_name: profile.last_name,
             email: profile.email,
             title,
             content,
             category: category!,
+            pinned,
           });
           console.log('Created note result:', created);
           if (created && created.id) {
             setCurrentNoteId(created.id);
-            // Return early to avoid double-creation
+            setTimeout(() => {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            }, 400);
             return;
           }
         } catch (e) {
@@ -125,56 +135,59 @@ const NoteEditScreen = () => {
           await updateSupabaseNote(currentNoteId, {
             user_id: profile.id,
             first_name: profile.first_name,
-            last_name: profile.last_name,
             email: profile.email,
             title,
             content,
             category: category!,
+            pinned,
           });
+          setTimeout(() => {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Dashboard' }],
+            });
+          }, 400);
         } catch (e) {
           console.log('Error updating note:', e);
         }
       }
     }
+    setSaving(false);
+  };
+
+  // Pin/Unpin note using Supabase
+  const handlePin = async () => {
+    if (!currentNoteId) return;
+    try {
+      await updateSupabaseNote(currentNoteId, { pinned: !pinned });
+      setPinned(!pinned);
+    } catch (e) {
+      console.log('Error pinning note:', e);
+    }
+  };
+
+  // Delete note using Supabase
+  const handleDelete = async () => {
+    if (!currentNoteId) return;
+    try {
+      await supabaseDeleteNote(currentNoteId);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
+    } catch (e) {
+      console.log('Error deleting note:', e);
+    }
   };
 
   const handleBack = async () => {
-    console.log('Saving note...');
-    await saveNote();
-    console.log('Note saved, resetting navigation');
+    if (saveTriggeredRef.current) return;
+    saveTriggeredRef.current = true;
+    if (!saving) await saveNote();
     navigation.reset({
       index: 0,
       routes: [{ name: 'Dashboard' }],
     });
-  };
-
-  const handleDelete = async () => {
-    Alert.alert(
-      'Delete Note',
-      'Are you sure you want to delete this note?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            if (currentNoteId) {
-              await deleteNote(currentNoteId);
-              navigation.goBack();
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handlePin = async () => {
-    if (currentNoteId) {
-      await pinNote(currentNoteId, !pinned);
-      setPinned(!pinned);
-    } else {
-      setPinned(!pinned);
-    }
   };
 
   const handlePlay = async () => {
