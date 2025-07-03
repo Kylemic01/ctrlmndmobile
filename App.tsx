@@ -16,6 +16,9 @@ import QuizPaywallScreen from './screens/quiz/QuizPaywallScreen';
 import NoteEditScreen from './screens/NoteEditScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import MeditateScreen from './screens/MeditateScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
+import AthleteProfileScreen from './screens/AthleteProfileScreen';
+import ChangePasswordScreen from './screens/ChangePasswordScreen';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -41,6 +44,9 @@ export default function App() {
           <Stack.Screen name="NoteEdit" component={NoteEditScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Meditate" component={MeditateScreen} />
+          <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="AthleteProfile" component={AthleteProfileScreen} />
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </AuthProvider>

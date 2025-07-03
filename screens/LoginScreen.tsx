@@ -127,9 +127,6 @@ const LoginScreen = () => {
               <Image source={require('../assets/logo.png')} style={styles.logo} />
             </View>
 
-            <Text style={styles.title}>Login to your account</Text>
-            <Text style={styles.subtitle}>Welcome back! Please enter your details.</Text>
-
             <View style={styles.form}>
               <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={20} color="gray" style={styles.inputIcon} />
@@ -236,6 +233,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '600',
     textAlign: 'center',
+    marginBottom: 20,
   },
   subtitle: {
     color: '#8A8A8E',

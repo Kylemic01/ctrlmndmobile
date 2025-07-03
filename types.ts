@@ -33,7 +33,10 @@ export type RootStackParamList = {
   QuizPaywall: undefined;
   NoteEdit: { noteId?: string; category?: NoteCategory };
   Settings: undefined;
-  Meditate: undefined;
+  Meditate: { audioUrl: string; noteTitle: string; goal: string };
+  EditProfile: undefined;
+  AthleteProfile: undefined;
+  ChangePassword: undefined;
 };
 
 export type AppNavigationProp = NativeStackNavigationProp<RootStackParamList>; 

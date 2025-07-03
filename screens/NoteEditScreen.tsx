@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions, Modal, Pressable, Platform } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions, Modal, Pressable, Platform, ActivityIndicator, ActionSheetIOS } from 'react-native';
 import { RouteProp, useNavigation, useRoute, useIsFocused } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import type { RootStackParamList, Note, NoteCategory, AppNavigationProp } from '../types';
 import { addNote as addSupabaseNote, updateNote as updateSupabaseNote, Note as SupabaseNote, getUserNotes, deleteNote as supabaseDeleteNote } from '../supabaseNotes';
 import { useAuth } from '../hooks/useAuth';
+import { generateMeditationAudio } from '../api/generateMeditation';
+import FireAnimation from '../components/FireAnimation';
+import { checkAndMarkFirstNoteOfDay, checkAndMarkGardenPopupShown, getStreak, updateStreak } from '../components/userStorage';
+import GardenPopupCard from '../components/GardenPopupCard';
+import * as ImagePicker from 'expo-image-picker';
+import MLKitOcr from 'expo-mlkit-ocr';
+// NOTE: expo-mlkit-ocr will NOT work in Expo Go. You must use a custom dev client or EAS build.
 
 const mockLoadNote = async (noteId: string): Promise<Note | null> => {
   // TODO: Replace with real storage logic
@@ -40,6 +47,12 @@ const NoteEditScreen = () => {
   const { profile } = useAuth();
   const [saving, setSaving] = useState(false);
   const saveTriggeredRef = useRef(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [showFireAnimation, setShowFireAnimation] = useState(false);
+  const [showGardenPopup, setShowGardenPopup] = useState(false);
+  const [gardenStreak, setGardenStreak] = useState(1);
+  const [ocrLoading, setOcrLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -77,6 +90,17 @@ const NoteEditScreen = () => {
         setTitle('');
         setContent('');
         setPinned(false);
+      }
+
+      // Check if this is the first note opened today
+      if (isFocused) {
+        const isFirstNoteOfDay = await checkAndMarkFirstNoteOfDay();
+        if (isFirstNoteOfDay) {
+          // Small delay to ensure the screen is fully loaded
+          setTimeout(() => {
+            setShowFireAnimation(true);
+          }, 500);
+        }
       }
     };
     if (isFocused || initialLoad.current) {
@@ -201,6 +225,89 @@ const NoteEditScreen = () => {
     setShowSheet(true);
   };
 
+  // Fire animation complete handler
+  const handleFireAnimationComplete = async () => {
+    setShowFireAnimation(false);
+    // Check if garden popup should be shown today
+    const shouldShowGarden = await checkAndMarkGardenPopupShown();
+    if (shouldShowGarden) {
+      // Update streak and show popup
+      const streak = await updateStreak();
+      setGardenStreak(streak);
+      setShowGardenPopup(true);
+    }
+  };
+
+  // OCR handler for photo icon
+  const handleOcrPhoto = async () => {
+    const pickImage = async () => {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        // MediaTypeOptions.Images is deprecated but required for this version
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+      return result;
+    };
+    const takePhoto = async () => {
+      const result = await ImagePicker.launchCameraAsync({
+        // MediaTypeOptions.Images is deprecated but required for this version
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+      return result;
+    };
+    let result;
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Take Photo', 'Choose from Library', 'Cancel'],
+          cancelButtonIndex: 2,
+        },
+        async (buttonIndex) => {
+          if (buttonIndex === 0) {
+            result = await takePhoto();
+          } else if (buttonIndex === 1) {
+            result = await pickImage();
+          } else {
+            return;
+          }
+          await processOcrResult(result);
+        }
+      );
+    } else {
+      // Android: simple prompt
+      const choice = window.confirm('Take photo? (Cancel for library)');
+      if (choice) {
+        result = await takePhoto();
+      } else {
+        result = await pickImage();
+      }
+      await processOcrResult(result);
+    }
+  };
+
+  const processOcrResult = async (result: any) => {
+    try {
+      if (result.canceled || !result.assets || !result.assets[0].uri) return;
+      setOcrLoading(true);
+      if (typeof MLKitOcr.recognizeText !== 'function') {
+        console.log('MLKitOcr methods:', MLKitOcr);
+        throw new Error('No recognizeText method found on MLKitOcr. Please check your expo-mlkit-ocr version.');
+      }
+      const ocrResult = await MLKitOcr.recognizeText(result.assets[0].uri);
+      // ocrResult.blocks is an array of text blocks
+      const recognizedText = ocrResult.blocks?.map((block: any) => block.text).join('\n') || '';
+      setContent(prev => prev + (prev ? '\n' : '') + recognizedText);
+      setOcrLoading(false);
+    } catch (err) {
+      setOcrLoading(false);
+      console.log('OCR error:', err);
+      alert('Failed to extract text from image.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>
@@ -214,7 +321,7 @@ const NoteEditScreen = () => {
           <TouchableOpacity onPress={handlePin} style={styles.iconButton}>
             <MaterialIcons name="push-pin" size={26} color={pinned ? "#ff8800" : "#fff"} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity style={styles.iconButton} onPress={handleOcrPhoto}>
             <Ionicons name="camera" size={26} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={handlePlay}>
@@ -237,6 +344,12 @@ const NoteEditScreen = () => {
         placeholderTextColor="#888"
         multiline
         numberOfLines={10}
+      />
+      
+      {/* Fire Animation for first note of the day */}
+      <FireAnimation
+        visible={showFireAnimation}
+        onAnimationComplete={handleFireAnimationComplete}
       />
       <Modal
         visible={showSheet}
@@ -269,16 +382,34 @@ const NoteEditScreen = () => {
                   <TouchableOpacity
                     key={opt}
                     style={[styles.wantOption, { backgroundColor: '#ff8800', alignItems: 'center' }]}
-                    onPress={() => {
+                    onPress={async () => {
                       if (!selectedTime || !selectedWant || selectedWant === 'Meditate') {
                         Alert.alert('Select Session Details', 'Please select a session time and a goal for this session before meditating.');
                         return;
                       }
-                      setShowSheet(false);
-                      navigation.navigate('Meditate');
+                      setIsGenerating(true);
+                      setGenerationError(null);
+                      try {
+                        const { audioUrl } = await generateMeditationAudio({
+                          goal: selectedWant,
+                          duration: selectedTime,
+                          noteContent: content,
+                        });
+                        setShowSheet(false);
+                        setIsGenerating(false);
+                        navigation.navigate('Meditate', {
+                          audioUrl,
+                          noteTitle: title,
+                          goal: selectedWant,
+                        });
+                      } catch (err: any) {
+                        setIsGenerating(false);
+                        setGenerationError(err.message || 'Failed to generate meditation audio.');
+                        alert(err.message || 'Failed to generate meditation audio.');
+                      }
                     }}
                   >
-                    <Text style={[styles.wantOptionText, { color: '#fff', fontWeight: 'bold' }]}>{opt}</Text>
+                    <Text style={[styles.wantOptionText, { color: '#fff', fontWeight: 'bold' }]}>Start</Text>
                   </TouchableOpacity>
                 );
               }
@@ -293,8 +424,27 @@ const NoteEditScreen = () => {
               );
             })}
           </View>
+          {isGenerating && (
+            <View style={{
+              position: 'absolute',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 100,
+            }}>
+              <Text style={{ color: '#fff', fontSize: 20, marginBottom: 16 }}>Generating your meditation...</Text>
+              <ActivityIndicator size="large" color="#ff8800" />
+              {generationError && <Text style={{ color: 'red', marginTop: 16 }}>{generationError}</Text>}
+            </View>
+          )}
         </View>
       </Modal>
+      <GardenPopupCard
+        visible={showGardenPopup}
+        streak={gardenStreak}
+        onContinue={() => setShowGardenPopup(false)}
+      />
     </View>
   );
 };
