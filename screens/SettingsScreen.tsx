@@ -10,6 +10,12 @@ import GardenPopupCard from '../components/GardenPopupCard';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as MailComposer from 'expo-mail-composer';
 import * as Linking from 'expo-linking';
+import { BlurView } from 'expo-blur';
+import VillainProfileProgress from '../components/VillainProfileProgress';
+import { fetchLeaderboard } from '../supabaseTeams';
+import MiniTeamLeaderboard from '../components/MiniTeamLeaderboard';
+import TeamLeaderboardScreen from './TeamLeaderboardScreen';
+import TeamCard from '../components/TeamCard';
 
 const BACKGROUND_TRACKS = [
   {
@@ -23,13 +29,14 @@ const PROFILE_IMAGE_KEY = 'profile_image';
 
 const SettingsScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
-  const { profile } = useAuth();
+  const { profile, teamMembership } = useAuth();
   const [user, setUserState] = useState<User | null>(null);
   const [avatar, setAvatar] = useState<string | undefined>(undefined);
   const [showGardenPopup, setShowGardenPopup] = useState(false);
   const [gardenStreak, setGardenStreak] = useState(1);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [faceIdEnabled, setFaceIdEnabled] = useState(false);
+  const [topTeams, setTopTeams] = useState<any[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -44,10 +51,22 @@ const SettingsScreen = () => {
       const saved = await AsyncStorage.getItem(PROFILE_IMAGE_KEY);
       if (saved) setAvatar(saved);
     })();
-  }, [profile]);
+    // Fetch top 5 teams for mini leaderboard
+    const loadLeaderboard = async () => {
+      const now = new Date();
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      try {
+        const teams = await fetchLeaderboard(month, 5);
+        setTopTeams(teams || []);
+      } catch (e) {
+        setTopTeams([]);
+      }
+    };
+    loadLeaderboard();
+  }, [profile, teamMembership]);
 
   const handleEditProfile = () => {
-    navigation.navigate('EditProfile');
+    navigation.navigate('AthleteProfile');
   };
 
   const handleAthleteProfile = () => {
@@ -99,34 +118,61 @@ const SettingsScreen = () => {
 
   return (
     <ScrollView style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 32 }}>
-      <View style={styles.container}>
-        {/* Back Button */}
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Dashboard')}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          <TouchableOpacity onPress={handlePickAvatar}>
+      </View>
+      <View style={{ height: 12 }} />
+      <View style={styles.container}>
+        {/* Profile Card - moved above leaderboard */}
+        <View style={styles.profileCard}>
+          <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {avatar ? (
-              <Image source={{ uri: avatar || '' }} style={styles.avatar} />
+              <Image source={{ uri: avatar }} style={styles.avatarLarge} />
             ) : (
-              <View style={styles.avatarPlaceholder} />
+              <View style={styles.avatarLarge} />
             )}
-          </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 16 }}>
-            <Text style={styles.profileName}>{user?.firstName} {user?.lastName}</Text>
-            <Text style={styles.profileEmail}>{user?.email}</Text>
+            <View style={{ marginLeft: 16, flex: 1 }}>
+              <Text style={styles.profileNameLarge}>{user?.firstName} {user?.lastName}</Text>
+              <Text style={styles.profileEmailLarge}>{user?.email}</Text>
+            </View>
           </View>
-          <TouchableOpacity style={styles.editProfileButton} onPress={handleEditProfile}>
-            <Text style={styles.editProfileText}>Edit profile</Text>
+          <TouchableOpacity style={styles.editProfileButtonLarge} onPress={handleEditProfile}>
+            <Text style={styles.editProfileTextLarge}>Edit profile</Text>
+          </TouchableOpacity>
+        </View>
+        {/* Progress features removed: TeamCard, MiniTeamLeaderboard, VillainProfileProgress, GardenPopupCard, streak info */}
+        <View style={styles.groupCardModern}>
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          <TouchableOpacity style={styles.groupRowModern} onPress={() => navigation.navigate('JoinTeam')}>
+            <View style={styles.iconBg}>
+              <Ionicons name="people-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>Join or Switch Team</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.groupRowModern} onPress={() => navigation.navigate('TeamLeaderboard')}>
+            <View style={styles.iconBg}>
+              <Ionicons name="trophy-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>View Full Leaderboard</Text>
+            <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
         </View>
 
-        {/* Preferences Group */}
-        <View style={styles.groupCard}>
-          <View style={styles.groupRow}>
-            <Ionicons name="notifications-outline" size={22} color="#fff" style={styles.groupIcon} />
-            <Text style={styles.groupLabel}>Notifications and sounds</Text>
+        {/* Preferences Section */}
+        <Text style={styles.sectionTitle}>Preferences</Text>
+        <View style={styles.groupCardModern}>
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          {/* Notifications */}
+          <View style={styles.groupRowModern}>
+            <View style={styles.iconBg}>
+              <Ionicons name="notifications-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>Notifications and sounds</Text>
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
@@ -135,28 +181,45 @@ const SettingsScreen = () => {
               style={{ marginLeft: 'auto' }}
             />
           </View>
-          <TouchableOpacity style={styles.groupRow} onPress={handleShowStreak}>
-            <Ionicons name="flame" size={22} color="#ff8800" style={styles.groupIcon} />
-            <Text style={styles.groupLabel}>View Streak</Text>
+          <View style={styles.divider} />
+          {/* View Streak */}
+          <TouchableOpacity style={styles.groupRowModern} onPress={handleShowStreak}>
+            <View style={styles.iconBg}>
+              <Ionicons name="flame" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>View Streak</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.groupRow} onPress={handleSetReminder}>
-            <Ionicons name="time-outline" size={22} color="#fff" style={styles.groupIcon} />
-            <Text style={styles.groupLabel}>Set Reminder</Text>
+          <View style={styles.divider} />
+          {/* Set Reminder */}
+          <TouchableOpacity style={styles.groupRowModern} onPress={handleSetReminder}>
+            <View style={styles.iconBg}>
+              <Ionicons name="time-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>Set Reminder</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
         </View>
 
-        {/* Account Group */}
-        <View style={styles.groupCard}>
-          <TouchableOpacity style={styles.groupRow} onPress={handleChangePassword}>
-            <Ionicons name="lock-closed-outline" size={22} color="#fff" style={styles.groupIcon} />
-            <Text style={styles.groupLabel}>Password</Text>
+        {/* Account Section */}
+        <Text style={styles.sectionTitle}>Account</Text>
+        <View style={styles.groupCardModern}>
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          {/* Password */}
+          <TouchableOpacity style={styles.groupRowModern} onPress={handleChangePassword}>
+            <View style={styles.iconBg}>
+              <Ionicons name="lock-closed-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>Password</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <View style={styles.groupRow}>
-            <Ionicons name="finger-print-outline" size={22} color="#fff" style={styles.groupIcon} />
-            <Text style={styles.groupLabel}>Login with Face ID</Text>
+          <View style={styles.divider} />
+          {/* Face ID */}
+          <View style={styles.groupRowModern}>
+            <View style={styles.iconBg}>
+              <Ionicons name="finger-print-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>Login with Face ID</Text>
             <Switch
               value={faceIdEnabled}
               onValueChange={setFaceIdEnabled}
@@ -165,29 +228,43 @@ const SettingsScreen = () => {
               style={{ marginLeft: 'auto' }}
             />
           </View>
-          <TouchableOpacity style={styles.groupRow} onPress={handleGiveFeedback}>
-            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#fff" style={styles.groupIcon} />
-            <Text style={styles.groupLabel}>Give Feedback</Text>
+          <View style={styles.divider} />
+          {/* Give Feedback */}
+          <TouchableOpacity style={styles.groupRowModern} onPress={handleGiveFeedback}>
+            <View style={styles.iconBg}>
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>Give Feedback</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.groupRow} onPress={handleAthleteProfile}>
-            <Ionicons name="person-outline" size={22} color="#fff" style={styles.groupIcon} />
-            <Text style={styles.groupLabel}>Your Athlete profile</Text>
+          <View style={styles.divider} />
+          {/* Athlete Profile */}
+          <TouchableOpacity style={styles.groupRowModern} onPress={handleAthleteProfile}>
+            <View style={styles.iconBg}>
+              <Ionicons name="person-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>Your Athlete profile</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.groupRow}>
-            <Ionicons name="shield-checkmark-outline" size={22} color="#fff" style={styles.groupIcon} />
-            <Text style={styles.groupLabel}>Terms and Privacy Policy</Text>
+          <View style={styles.divider} />
+          {/* Terms and Privacy Policy */}
+          <TouchableOpacity style={styles.groupRowModern}>
+            <View style={styles.iconBg}>
+              <Ionicons name="shield-checkmark-outline" size={20} color="#fff" />
+            </View>
+            <Text style={styles.groupLabelModern}>Terms and Privacy Policy</Text>
             <Ionicons name="chevron-forward" size={20} color="#888" style={{ marginLeft: 'auto' }} />
           </TouchableOpacity>
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-          <Ionicons name="log-out-outline" size={22} color="#fff" style={styles.groupIcon} />
-          <Text style={styles.logoutText}>Logout</Text>
+        {/* Mindset Villain Section - moved above logout */}
+        {/* Logout Button */}
+        <TouchableOpacity style={styles.logoutCard} onPress={handleSignOut}>
+          <View style={styles.iconBgRed}>
+            <Ionicons name="log-out-outline" size={20} color="#fff" />
+          </View>
+          <Text style={styles.logoutTextModern}>Logout</Text>
         </TouchableOpacity>
-
         {/* Streak Popup */}
         <GardenPopupCard
           visible={showGardenPopup}
@@ -210,83 +287,109 @@ const styles = StyleSheet.create({
     padding: 0,
     alignItems: 'stretch',
   },
-  backButton: {
-    position: 'absolute',
-    top: 44,
-    left: 18,
-    zIndex: 10,
-    padding: 8,
-  },
-  profileSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#232323',
-    borderRadius: 18,
-    padding: 18,
-    marginTop: 100, // increased for more space below back button
+  profileCard: {
+    backgroundColor: 'rgba(35,35,35,0.85)',
+    borderRadius: 24,
     marginHorizontal: 18,
     marginBottom: 18,
+    padding: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+    position: 'relative',
   },
-  avatar: {
+  avatarLarge: {
     width: 60,
     height: 60,
     borderRadius: 30,
     backgroundColor: '#444',
   },
-  avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#444',
-  },
-  profileName: {
+  profileNameLarge: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  profileEmail: {
+  profileEmailLarge: {
     color: '#aaa',
     fontSize: 14,
     marginTop: 2,
   },
-  editProfileButton: {
-    backgroundColor: '#2d2d2d',
+  editProfileButtonLarge: {
+    backgroundColor: '#2196F3',
     borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    marginLeft: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    alignSelf: 'flex-start',
+    marginTop: 16,
   },
-  editProfileText: {
-    color: '#ff8800',
+  editProfileTextLarge: {
+    color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
   },
-  groupCard: {
-    backgroundColor: '#232323',
-    borderRadius: 18,
+  sectionTitle: {
+    color: '#aaa',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 28,
+    marginBottom: 6,
+    marginTop: 18,
+    letterSpacing: 0.5,
+  },
+  groupCardModern: {
+    backgroundColor: 'rgba(35,35,35,0.85)',
+    borderRadius: 24,
     marginHorizontal: 18,
     marginBottom: 18,
-    paddingVertical: 2,
-    paddingHorizontal: 0,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 4,
+    position: 'relative',
   },
-  groupRow: {
+  groupRowModern: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#292929',
+    backgroundColor: 'transparent',
   },
-  groupIcon: {
+  iconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 16,
   },
-  groupLabel: {
+  iconBgRed: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#ff3b30',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  groupLabelModern: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '500',
+    flex: 1,
   },
-  logoutButton: {
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    marginLeft: 54,
+    marginRight: 0,
+  },
+  logoutCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ff3b30',
@@ -296,12 +399,50 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  logoutText: {
+  logoutTextModern: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    marginLeft: 8,
+    marginBottom: 8,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginRight: 8,
+    marginTop: 24,
+    marginLeft: 12,
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  section: {
+    marginHorizontal: 18,
+    marginBottom: 18,
+    backgroundColor: 'rgba(35,35,35,0.85)',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
   },
 });
 

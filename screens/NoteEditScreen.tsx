@@ -11,6 +11,8 @@ import { checkAndMarkFirstNoteOfDay, checkAndMarkGardenPopupShown, getStreak, up
 import GardenPopupCard from '../components/GardenPopupCard';
 import * as ImagePicker from 'expo-image-picker';
 import MLKitOcr from 'expo-mlkit-ocr';
+import Loader from '../components/Loader';
+import { recordSession } from '../supabaseTeams';
 // NOTE: expo-mlkit-ocr will NOT work in Expo Go. You must use a custom dev client or EAS build.
 
 const mockLoadNote = async (noteId: string): Promise<Note | null> => {
@@ -20,7 +22,12 @@ const mockLoadNote = async (noteId: string): Promise<Note | null> => {
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
-const TIME_OPTIONS = ['6 min', '8 min', '10 min'];
+// Replace TIME_OPTIONS with label/value pairs
+const TIME_OPTIONS = [
+  { label: 'Short', value: '6 min' },
+  { label: 'Medium', value: '8 min' },
+  { label: 'Long', value: '10 min' },
+];
 const WANT_OPTIONS = [
   'Confidence', 'Relaxation',
   'Neurotraining', 'Motivation',
@@ -41,7 +48,7 @@ const NoteEditScreen = () => {
   const [isNew, setIsNew] = useState(false);
   const initialLoad = useRef(true);
   const [showSheet, setShowSheet] = useState(false);
-  const [selectedTime, setSelectedTime] = useState('8 min');
+  const [selectedTime, setSelectedTime] = useState(TIME_OPTIONS[1].value);
   const [selectedWant, setSelectedWant] = useState('Motivation');
   const [currentNoteId, setCurrentNoteId] = useState(noteId);
   const { profile } = useAuth();
@@ -141,15 +148,21 @@ const NoteEditScreen = () => {
             category: category!,
             pinned,
           });
+          // Record session for team points if category is Daily Journals
+          if (category === 'Daily Journals') {
+            const today = new Date().toISOString().slice(0, 10);
+            await recordSession(profile.id, 'journal', today);
+          }
           console.log('Created note result:', created);
           if (created && created.id) {
             setCurrentNoteId(created.id);
             if (shouldNavigateAway) {
               setTimeout(() => {
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: 'Dashboard' }],
-                });
+                if (navigation.canGoBack()) {
+                  navigation.goBack();
+                } else {
+                  navigation.navigate('Dashboard');
+                }
               }, 400);
               return;
             }
@@ -171,10 +184,14 @@ const NoteEditScreen = () => {
           });
           if (shouldNavigateAway) {
             setTimeout(() => {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Dashboard' }],
-              });
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'MainTabs' }],
+                });
+              }
             }, 400);
           }
         } catch (e) {
@@ -203,7 +220,7 @@ const NoteEditScreen = () => {
       await supabaseDeleteNote(currentNoteId);
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Dashboard' }],
+        routes: [{ name: 'MainTabs' }],
       });
     } catch (e) {
       console.log('Error deleting note:', e);
@@ -214,10 +231,15 @@ const NoteEditScreen = () => {
     if (saveTriggeredRef.current) return;
     saveTriggeredRef.current = true;
     if (!saving) await saveNote();
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Dashboard' }],
-    });
+    // Try to go back (left-to-right animation), but if not possible, reset to Dashboard
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
+    }
   };
 
   const handlePlay = async () => {
@@ -366,11 +388,11 @@ const NoteEditScreen = () => {
           <View style={styles.timeRow}>
             {TIME_OPTIONS.map(opt => (
               <TouchableOpacity
-                key={opt}
-                style={[styles.timeOption, selectedTime === opt ? styles.timeOptionSelected : null]}
-                onPress={() => setSelectedTime(opt)}
+                key={opt.value}
+                style={[styles.timeOption, selectedTime === opt.value ? styles.timeOptionSelected : null]}
+                onPress={() => setSelectedTime(opt.value)}
               >
-                <Text style={[styles.timeOptionText, selectedTime === opt ? styles.timeOptionTextSelected : null]}>{opt}</Text>
+                <Text style={[styles.timeOptionText, selectedTime === opt.value ? styles.timeOptionTextSelected : null]}>{opt.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -390,10 +412,17 @@ const NoteEditScreen = () => {
                       setIsGenerating(true);
                       setGenerationError(null);
                       try {
+                        // Build context for Gemini prompt
+                        let athleteContext = '';
+                        if (profile?.position || profile?.short_term_goal) {
+                          athleteContext = `\n\nAthlete Info:\n`;
+                          if (profile.position) athleteContext += `Position: ${profile.position}\n`;
+                          if (profile.short_term_goal) athleteContext += `Short Term Goal: ${profile.short_term_goal}\n`;
+                        }
                         const { audioUrl } = await generateMeditationAudio({
                           goal: selectedWant,
                           duration: selectedTime,
-                          noteContent: content,
+                          noteContent: content + athleteContext,
                         });
                         setShowSheet(false);
                         setIsGenerating(false);
@@ -428,13 +457,13 @@ const NoteEditScreen = () => {
             <View style={{
               position: 'absolute',
               top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.7)',
+              backgroundColor: 'rgba(0,0,0,0.95)',
               alignItems: 'center',
               justifyContent: 'center',
               zIndex: 100,
             }}>
-              <Text style={{ color: '#fff', fontSize: 20, marginBottom: 16 }}>Generating your meditation...</Text>
-              <ActivityIndicator size="large" color="#ff8800" />
+              <Text style={{ color: '#fff', fontSize: 20, marginBottom: 16 }}>Building your personalized meditation. Take a second to find a comfortable spot.</Text>
+              <Loader />
               {generationError && <Text style={{ color: 'red', marginTop: 16 }}>{generationError}</Text>}
             </View>
           )}
@@ -561,8 +590,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 24,
     margin: 4,
-    minWidth: '40%',
-    alignItems: 'flex-start',
+    minWidth: '45%',
+    alignItems: 'center',
   },
   wantOptionSelected: {
     backgroundColor: '#fff',
@@ -571,6 +600,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   wantOptionTextSelected: {
     color: '#181818',

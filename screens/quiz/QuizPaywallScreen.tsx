@@ -9,9 +9,27 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../supabase';
 
 const QuizPaywallScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
+
+  const handleContinue = async () => {
+    try {
+      // Mark quiz as completed when user proceeds past paywall
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({ 
+          quiz_completed: true 
+        }).eq('id', user.id);
+      }
+      navigation.navigate('MainTabs');
+    } catch (error) {
+      console.error('Failed to mark quiz as completed:', error);
+      // Still navigate even if update fails
+      navigation.navigate('MainTabs');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -37,7 +55,7 @@ const QuizPaywallScreen = () => {
       </View>
       <TouchableOpacity 
         style={styles.continueButton} 
-        onPress={() => navigation.navigate('Dashboard')}
+        onPress={handleContinue}
       >
         <Text style={styles.continueButtonText}>Subscribe Now</Text>
       </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { AppNavigationProp } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 import ProgressBar from '../../components/ProgressBar';
@@ -187,6 +187,48 @@ function generateQuizResult(answers: Record<string, string>) {
   };
 }
 
+function generateGeneralResult(answers: Record<string, string>) {
+  const benefitMap: Record<string, string> = {
+    'To feel less stressed': 'reduce your stress levels',
+    'To improve my sleep': 'sleep more soundly',
+    'To be more present in life': 'feel more present and grounded',
+    'To feel more in control of my emotions': 'regulate your emotions better',
+    'To stop overthinking everything': 'quiet your inner noise',
+    'To build a better relationship with myself': 'build more self-trust and compassion',
+  };
+
+  const struggleMap: Record<string, string> = {
+    'Managing stress or anxiety': 'manage stress and anxiety',
+    'Staying focused or avoiding distractions': 'improve focus and reduce distractions',
+    'Keeping a consistent routine': 'create daily habits that stick',
+    'Negative self-talk': 'develop kinder self-talk',
+    'Feeling overwhelmed or burnt out': 'feel more balanced and energized',
+    'Not prioritizing myself': 'start putting yourself first',
+  };
+
+  const focusMap: Record<string, string> = {
+    'My ability to stay calm under stress': 'stay calm under stress',
+    'Letting go of negative thoughts': 'let go of negative thoughts',
+    'Focusing better without distractions': 'focus better without distractions',
+    'Building a routine I actually stick to': 'build a routine you actually stick to',
+    'Believing I’m enough as I am': 'believe you’re enough as you are',
+    'Handling emotions without overreacting': 'handle emotions without overreacting',
+  };
+
+  const focusPhraseRaw = answers["If you could change one thing about how your mind works, what would it be?"];
+  const focusPhrase = focusMap[focusPhraseRaw] || (focusPhraseRaw ? focusPhraseRaw.toLowerCase() : 'feel better');
+  const benefit = benefitMap[answers["What’s your main reason for wanting to improve your mindset?"]] || "feel better";
+  const struggle = struggleMap[answers["What’s your biggest challenge day to day?"]] || "improve your well-being";
+
+  const stat = "You're not alone — over 82% of users have similar goals.";
+  return {
+    title: "The Self-Care Starter",
+    stat,
+    sentence: `You’re here to ${benefit}, and we’ll help you ${struggle}.`,
+    outcome: `Let’s work together to help you ${focusPhrase}.`,
+  };
+}
+
 const athleteStats = [
   { label: 'athletes improved', percent: 96 },
   { label: 'felt they recovered faster', percent: 81 },
@@ -207,20 +249,157 @@ const athleteReviews = [
   },
 ];
 
+// Non-athlete quiz steps (from nonathleteflow.md)
+const generalHealthQuizSteps = [
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'What’s your main reason for wanting to improve your mindset?',
+    options: [
+      'To feel less stressed',
+      'To improve my sleep',
+      'To be more present in life',
+      'To feel more in control of my emotions',
+      'To stop overthinking everything',
+      'To build a better relationship with myself',
+    ],
+  },
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'What’s your biggest challenge day to day?',
+    options: [
+      'Managing stress or anxiety',
+      'Staying focused or avoiding distractions',
+      'Keeping a consistent routine',
+      'Negative self-talk',
+      'Feeling overwhelmed or burnt out',
+      'Not prioritizing myself',
+    ],
+  },
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'How would you describe your mental state most days?',
+    options: [
+      'Anxious or on edge',
+      'Foggy or unmotivated',
+      'Okay but could be better',
+      'Mostly calm with some stress',
+      'Overloaded and reactive',
+      'I don’t really notice or reflect on it',
+    ],
+  },
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'When things feel overwhelming, what do you usually do?',
+    options: [
+      'Push through and ignore it',
+      'Scroll or zone out',
+      'Talk to someone I trust',
+      'Take a break or breathe',
+      'Shut down emotionally',
+      'Beat myself up about it',
+    ],
+  },
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'What’s something you want to feel more of in your daily life?',
+    options: [
+      'Calm and grounded',
+      'Clarity and focus',
+      'Self-acceptance',
+      'Motivation and energy',
+      'Joy and lightness',
+      'Confidence in who I am',
+    ],
+  },
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'How do you feel about meditation or mental training right now?',
+    options: [
+      'Excited to start and stay consistent',
+      'Curious but unsure it works',
+      'I’ve tried but never stuck with it',
+      'Skeptical but open',
+      'Overwhelmed by all the options',
+      'Not sure it’s for me',
+    ],
+  },
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'If you could change one thing about how your mind works, what would it be?',
+    options: [
+      'My ability to stay calm under stress',
+      'Letting go of negative thoughts',
+      'Focusing better without distractions',
+      'Building a routine I actually stick to',
+      'Believing I’m enough as I am',
+      'Handling emotions without overreacting',
+    ],
+  },
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'Are you ready to create a few minutes of peace and progress each day?',
+    options: [
+      "Yes, I'm ready to commit",
+      "I want to try it out",
+      "I’m curious but hesitant",
+      "I’ve struggled to stick with things before",
+      "Not really, just exploring for now",
+    ],
+  },
+  {
+    type: 'SINGLE_CHOICE' as const,
+    question: 'Would you invest 7 minutes a day to feel better, think clearer, and reconnect with yourself?',
+    options: [
+      'Yes, let’s do this',
+      'Maybe, if it’s really simple',
+    ],
+  },
+];
+
+const nonAthleteStats = [
+  { label: 'users felt less stressed', percent: 89 },
+  { label: 'improved their sleep', percent: 76 },
+  { label: 'felt more present and mindful', percent: 83 },
+  { label: 'felt more in control of emotions', percent: 78 },
+  { label: 'reported better self-care', percent: 91 },
+  { label: 'felt more balanced and energized', percent: 85 },
+];
+const nonAthleteReviews = [
+  {
+    quote: "Sophie - Busy Professional\n⭐️⭐️⭐️⭐️⭐️\nCTRL/MND helped me finally build a meditation habit. I feel less anxious and more focused at work. The sessions are short and easy to fit into my day!",
+  },
+  {
+    quote: "James - New Parent\n⭐️⭐️⭐️⭐️⭐️\nI never thought I'd be able to meditate, but CTRL/MND made it simple. I sleep better and feel more patient with my kids. Highly recommend for anyone who wants to feel calmer!",
+  },
+  {
+    quote: "Priya - Grad Student\n⭐️⭐️⭐️⭐️⭐️\nThe app's gentle reminders and variety of sessions keep me coming back. My stress is way down, and I feel more present in my daily life.",
+  },
+];
+
 const QuizWizardScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
+  const route = useRoute();
+  const { userType, variant } = (route.params || {}) as { userType?: 'athlete' | 'non-athlete', variant?: string };
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<any>({});
   const [showResult, setShowResult] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [statAnims, setStatAnims] = useState(athleteStats.map(() => 0));
   const [revealAnim, setRevealAnim] = useState(false);
+  const [questionSet, setQuestionSet] = useState(userType === 'non-athlete' ? generalHealthQuizSteps : quizSteps);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const currentQuestion = quizSteps[currentStep];
+  // Remove useEffect that fetches userType from Supabase
+
+  // Always call all hooks before any return!
+
+  const currentQuestion = questionSet[currentStep];
 
   const handleNext = () => {
-    if (currentStep < quizSteps.length - 1) {
+    if (currentStep < questionSet.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       handleQuizComplete(answers);
@@ -236,37 +415,38 @@ const QuizWizardScreen = () => {
   };
 
   const handleQuizComplete = async (answers: any) => {
+    setLoading(true);
+    setFetchError(null);
     try {
       // First ensure the profile row exists
       await ensureProfileRowExists({});
-      
-      // Then update with quiz answers
-      const result = await updateQuizAnswers(answers);
-      
-      if (result.error) {
-        console.error('Failed to save quiz answers:', result.error);
-        // You might want to show an error message to the user here
-        // For now, we'll continue to show the result even if saving fails
+      // Then update with quiz answers and userType
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({ 
+          user_type: userType, 
+          quiz_answers: answers,
+          quiz_completed: false // Will be set to true after paywall
+        }).eq('id', user.id);
       }
-      
       setShowResult(true);
       setRevealAnim(true);
       setTimeout(() => setRevealAnim(false), 1200);
     } catch (error) {
-      console.error('Error in handleQuizComplete:', error);
-      // Continue to show result even if there's an error
-      setShowResult(true);
-      setRevealAnim(true);
-      setTimeout(() => setRevealAnim(false), 1200);
+      setFetchError('Failed to save your quiz. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   // Animate stats when stats page is shown
   React.useEffect(() => {
     if (showStats) {
-      let anims = Array(athleteStats.length).fill(0);
+      const isNonAthlete = userType === 'non-athlete';
+      const stats = isNonAthlete ? nonAthleteStats : athleteStats;
+      let anims = Array(stats.length).fill(0);
       setStatAnims(anims);
-      athleteStats.forEach((stat, i) => {
+      stats.forEach((stat, i) => {
         let progress = 0;
         const interval = setInterval(() => {
           progress += 2;
@@ -277,14 +457,30 @@ const QuizWizardScreen = () => {
         }, 16);
       });
     }
-  }, [showStats]);
+  }, [showStats, userType]);
 
   const handleAnswer = (answer: string | string[]) => {
     setAnswers({ ...answers, [currentQuestion.question]: answer });
   };
 
+  if (loading) {
+    return <View style={{ flex: 1, backgroundColor: '#0d0d0d', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#fff', fontSize: 20 }}>Loading...</Text></View>;
+  }
+  if (fetchError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0d0d0d', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <Text style={{ color: '#ff4d4f', fontSize: 18, marginBottom: 24, textAlign: 'center' }}>{fetchError}</Text>
+        <TouchableOpacity style={{ backgroundColor: '#ff8800', borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32 }} onPress={() => handleQuizComplete(answers)}>
+          <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (showResult) {
-    const result = generateQuizResult(answers);
+    const result = userType === 'non-athlete'
+      ? generateGeneralResult(answers)
+      : generateQuizResult(answers);
     if (!showStats) {
       // Personalized result page
       return (
@@ -316,14 +512,20 @@ const QuizWizardScreen = () => {
           </LinearGradient>
         </SafeAreaView>
       );
-    } else if (!showPaywall) {
-      // Stats & reviews page
+    }
+    if (!showReviews) {
+      // Stats page only (x% improved X)
+      const isNonAthlete = userType === 'non-athlete';
+      const stats = isNonAthlete ? nonAthleteStats : athleteStats;
+      const statsHeader = isNonAthlete
+        ? 'Users have reported these results:'
+        : 'Athletes have reported these results:';
       return (
         <SafeAreaView style={styles.container}>
           <ScrollView contentContainerStyle={styles.statsScrollContent}>
-            <Text style={styles.statsHeader}>Athletes have reported these results:</Text>
+            <Text style={styles.statsHeader}>{statsHeader}</Text>
             <View style={styles.statsListBox}>
-              {athleteStats.map((stat, i) => (
+              {stats.map((stat, i) => (
                 <View key={stat.label} style={styles.statRow}>
                   <View style={styles.statCircleContainer}>
                     <View style={styles.statCircleBg} />
@@ -333,35 +535,51 @@ const QuizWizardScreen = () => {
                 </View>
               ))}
             </View>
+            <TouchableOpacity style={styles.quizButton} onPress={() => setShowReviews(true)}>
+              <Text style={styles.quizButtonText}>See Success</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
+    if (!showPaywall) {
+      // Reviews page only
+      const isNonAthlete = userType === 'non-athlete';
+      const reviews = isNonAthlete ? nonAthleteReviews : athleteReviews;
+      const reviewsHeader = isNonAthlete
+        ? 'What users are saying about CTRL/MND'
+        : 'What athletes are saying about CTRL/MND';
+      return (
+        <SafeAreaView style={styles.container}>
+          <ScrollView contentContainerStyle={styles.statsScrollContent}>
             <View style={styles.reviewsHeaderBox}>
-              <Text style={styles.reviewsHeader}>What athletes are saying about CTRL/MND</Text>
+              <Text style={styles.reviewsHeader}>{reviewsHeader}</Text>
             </View>
             <View style={styles.reviewsListBox}>
-              {athleteReviews.map((review, i) => (
+              {reviews.map((review, i) => (
                 <View key={i} style={styles.reviewCard}>
                   <Text style={styles.reviewQuote}>{review.quote}</Text>
                 </View>
               ))}
             </View>
             <TouchableOpacity style={styles.quizButton} onPress={() => setShowPaywall(true)}>
-              <Text style={styles.quizButtonText}>I want results</Text>
+              <Text style={styles.quizButtonText}>Continue</Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
       );
-    } else {
-      // Paywall placeholder
-      return (
-        <SafeAreaView style={styles.container}>
-          <View style={styles.paywallContainer}>
-            <Text style={styles.paywallText}>This is where the paywall will go.</Text>
-            <TouchableOpacity style={styles.quizButton} onPress={() => navigation.navigate('Dashboard')}>
-              <Text style={styles.quizButtonText}>Continue</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      );
     }
+    // Paywall placeholder
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.paywallContainer}>
+          <Text style={styles.paywallText}>This is where the paywall will go.</Text>
+          <TouchableOpacity style={styles.quizButton} onPress={() => navigation.navigate('Dashboard')}>
+            <Text style={styles.quizButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -372,10 +590,11 @@ const QuizWizardScreen = () => {
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <View style={{ flex: 1, paddingHorizontal: 20 }}>
-            <ProgressBar progress={(currentStep + 1) / quizSteps.length} />
+            <ProgressBar progress={(currentStep + 1) / questionSet.length} />
           </View>
         </View>
         <View style={styles.content}>
+          <Text style={{ color: '#ff8800', fontSize: 16, marginBottom: 8 }}>Experiment Variant: {variant}</Text>
           <Text style={[styles.questionText, currentQuestion.question === 'I want to improve - check all that apply' && {marginTop: 100}]}>{currentQuestion.question}</Text>
           <View>
             {currentQuestion.options?.map(option => (

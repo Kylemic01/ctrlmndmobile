@@ -16,7 +16,7 @@ const reviews = [
     quote: "Tim - Pro Swimmer\n⭐️⭐️⭐️⭐️⭐️\nI've tried countless meditation apps, but CTRL/MND is on another level. The AI-powered guided sessions are so personalized that it feels like a coach in my pocket. My stress levels have plummeted, my focus has skyrocketed, and I actually look forward to meditating every day. The whole experience is calming. Highly recommend!",
   },
   {
-    quote: "Charlotte - College Athlete\n⭐️⭐️⭐️⭐️⭐️\nAfter just one week with CTRL/MND, I noticed a huge difference in how I handle anxiety. The pre-configured routines are perfect when I'm short on time, and the deeper mindfulness courses have given me tools I never knew I needed. Beautifully designed, and genuinely effective.",
+    quote: "Charlotte - College Athlete\n⭐️⭐️⭐️⭐️⭐️\nAfter just one week with Tim, I fell in love. Ive never felt like this before, I noticed a huge difference in how I handle anxiety. The pre-configured routines are perfect when I'm short on time, and the deeper mindfulness courses have given me tools I never knew I needed. Beautifully designed, and genuinely effective.",
   },
   {
     quote: "Max - Junior Basketball Player\n⭐️⭐️⭐️⭐️⭐️\nAs a competitive athlete, mental toughness is everything. CTRL/MND's tailored meditations have become an essential part of my training. The guided visualizations before game day calm my nerves, and the post-practice reflections help me reset. Five stars for a game-changing app!",

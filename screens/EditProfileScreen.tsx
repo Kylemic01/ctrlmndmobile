@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -9,6 +11,7 @@ const PROFILE_IMAGE_KEY = 'profile_image';
 
 const EditProfileScreen = () => {
   const navigation = useNavigation();
+  const { profile, refreshProfile } = useAuth();
   const [avatar, setAvatar] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -33,6 +36,11 @@ const EditProfileScreen = () => {
   const handleSave = async () => {
     if (avatar) {
       await AsyncStorage.setItem(PROFILE_IMAGE_KEY, avatar);
+      // Update avatar in Supabase profile if logged in
+      if (profile && profile.id) {
+        await supabase.from('profiles').update({ avatar }).eq('id', profile.id);
+        await refreshProfile();
+      }
     }
     Alert.alert('Saved', 'Profile image updated!');
     navigation.goBack();
@@ -71,7 +79,7 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     top: 48,
-    left: 18,
+    left: 8,
     zIndex: 10,
     padding: 8,
   },
@@ -95,6 +103,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     backgroundColor: '#444',
     marginBottom: 8,
+    marginTop: 24,
   },
   changePhotoText: {
     color: '#ff8800',

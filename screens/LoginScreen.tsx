@@ -72,7 +72,10 @@ const LoginScreen = () => {
 
         if (userExists) {
             Alert.alert('Welcome back!', 'You have been logged in successfully.');
-            navigation.navigate('Dashboard');
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'MainTabs' }],
+            });
         } else {
             // If user does not exist, create a new account
             const password = Math.random().toString(36).slice(-8); // Generate a random password
@@ -105,7 +108,11 @@ const LoginScreen = () => {
         await refreshProfile();
       }
       Alert.alert('Success', 'Logged in successfully!');
-      navigation.navigate('Dashboard');
+      // Navigate to MainTabs - AppNavigator will handle quiz completion check
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
     } catch (error: any) {
       Alert.alert('Error', 'Something went wrong during login.');
       console.error(error);

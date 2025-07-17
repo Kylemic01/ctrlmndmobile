@@ -27,7 +27,7 @@ export type RootStackParamList = {
   Dashboard: undefined;
   QuizIntro: undefined;
   QuizStreak: undefined;
-  QuizWizard: undefined;
+  QuizWizard: { userType?: 'athlete' | 'non-athlete' } | undefined;
   QuizReviews: undefined;
   QuizGraph: undefined;
   QuizPaywall: undefined;
@@ -37,6 +37,10 @@ export type RootStackParamList = {
   EditProfile: undefined;
   AthleteProfile: undefined;
   ChangePassword: undefined;
+  MainTabs: undefined;
+  VillainDamage: undefined;
+  TeamLeaderboard: undefined;
+  JoinTeam: undefined;
 };
 
 export type AppNavigationProp = NativeStackNavigationProp<RootStackParamList>; 

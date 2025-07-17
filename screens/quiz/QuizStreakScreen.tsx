@@ -10,9 +10,22 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { AppNavigationProp } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
+import UserTypeSelectScreen from '../UserTypeSelectScreen';
+import { supabase } from '../../supabase';
 
 const QuizStreakScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
+  const [showUserType, setShowUserType] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleUserTypeSelect = (type: 'athlete' | 'non-athlete', variant?: string) => {
+    navigation.navigate('QuizWizard', { userType: type, variant });
+  };
+
+  if (showUserType) {
+    return <UserTypeSelectScreen onSelect={handleUserTypeSelect} loading={loading} error={error} />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -27,7 +40,7 @@ const QuizStreakScreen = () => {
       </View>
       <TouchableOpacity 
         style={styles.continueButton} 
-        onPress={() => navigation.navigate('QuizWizard')}
+        onPress={() => setShowUserType(true)}
       >
         <Text style={styles.continueButtonText}>Continue</Text>
       </TouchableOpacity>

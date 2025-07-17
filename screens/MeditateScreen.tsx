@@ -1,13 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator, Animated, Dimensions, FlatList } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator, Animated, Dimensions, FlatList, Easing } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import type { AppNavigationProp } from '../types';
+import { VillainProvider, useVillain } from '../components/VillainProvider';
+import MonsterDamagePopup from '../components/MonsterDamagePopup';
+import VillainReveal from '../components/VillainReveal';
+import VillainDefeatOverlay from '../components/VillainDefeatOverlay';
+import Loader from '../components/Loader';
+import { recordSession } from '../supabaseTeams';
+import { useAuth } from '../hooks/useAuth';
+import LottieView from 'lottie-react-native';
 
 const ACCENT = '#ff8800';
 const DARK = '#0d0d0d';
-const CIRCLE_SIZE = Dimensions.get('window').width * 0.6;
+const CIRCLE_SIZE = Dimensions.get('window').width * 1;
 
 const BACKGROUND_TRACKS = [
   {
@@ -28,11 +36,28 @@ const BACKGROUND_TRACKS = [
   },
 ];
 
+const RELAX_COLORS = ['#6a8cff', '#b388ff', '#7ee8fa', '#eec0c6'];
+
 // Add type for route params
 type MeditateScreenParams = {
   audioUrl?: string;
   noteTitle?: string;
+  goal?: string;
 };
+
+// Lottie animation component for meditation
+function MeditationLottie() {
+  return (
+    <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: CIRCLE_SIZE, height: CIRCLE_SIZE, marginTop: 60, }}>
+      <LottieView
+        source={require('../assets/lottie/breatheanimation.json')}
+        autoPlay
+        loop
+        style={{ width: CIRCLE_SIZE, height: CIRCLE_SIZE }}
+      />
+    </View>
+  );
+}
 
 const MeditateScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
@@ -45,6 +70,31 @@ const MeditateScreen = () => {
   const [position, setPosition] = useState(0);
   const mainSoundRef = useRef<Audio.Sound | null>(null);
   const animation = useRef(new Animated.Value(1)).current;
+  const colorAnim = useRef(new Animated.Value(0)).current;
+  const [showDamagePopup, setShowDamagePopup] = useState(false);
+  const [showReveal, setShowReveal] = useState(false);
+  const [showDefeat, setShowDefeat] = useState(false);
+  const { currentVillain, villainHealth, damageVillain, defeatVillain } = useVillain();
+  const { user } = useAuth();
+
+  // Relaxing animation (color pulse)
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(colorAnim, {
+          toValue: 1,
+          duration: 4000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(colorAnim, {
+          toValue: 0,
+          duration: 4000,
+          useNativeDriver: false,
+        }),
+      ])
+    ).start();
+    return () => colorAnim.stopAnimation();
+  }, [colorAnim]);
 
   // Breathing animation
   useEffect(() => {
@@ -146,10 +196,58 @@ const MeditateScreen = () => {
   // Progress bar width
   const progress = duration > 0 ? position / duration : 0;
 
+  // Interpolate color for relaxing animation
+  const animatedColor = colorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [RELAX_COLORS[0], RELAX_COLORS[1]],
+  });
+
+  // Extract meditation selection from noteTitle if possible (fallback to 'session')
+  const selectionMap: Record<string, string> = {
+    relax: 'relaxation',
+    relaxation: 'relaxation',
+    motivation: 'motivation',
+    neurotraining: 'neurotraining session',
+    'game time': 'game day',
+    gameday: 'game day',
+    reassurance: 'reassurance',
+    sleep: 'sleep',
+    rehab: 'rehab',
+    confidence: 'confidence',
+    focus: 'focus',
+    daily: 'daily mindset',
+    // add more as needed
+  };
+
+  let selection = 'session';
+  if (noteTitle) {
+    const match = noteTitle.match(/(Relax|Relaxation|Motivation|Rehab|Game Time|Gameday|Reassurance|Neurotraining|Sleep|Confidence|Focus|Daily)/i);
+    if (match) {
+      const key = match[0].toLowerCase();
+      selection = selectionMap[key] || key;
+    }
+  }
+
+  // Handler for End button: navigate to VillainDamageScreen
+  const handleEndMeditation = async () => {
+    if (mainSoundRef.current) {
+      const status = await mainSoundRef.current.getStatusAsync();
+      if (status.isLoaded && status.isPlaying) {
+        await mainSoundRef.current.pauseAsync();
+      }
+    }
+    // Record session for team points
+    if (user && user.id) {
+      const today = new Date().toISOString().slice(0, 10);
+      await recordSession(user.id, 'meditation', today);
+    }
+    navigation.navigate('VillainDamage');
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={ACCENT} style={{ marginTop: 80 }} />
+        <Loader />
         <Text style={{ color: '#fff', marginTop: 24 }}>Loading meditation audio...</Text>
       </SafeAreaView>
     );
@@ -173,19 +271,19 @@ const MeditateScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{noteTitle || 'Meditation'}</Text>
-        <View style={{ width: 36 }} />
+        <Text style={styles.title} numberOfLines={3} ellipsizeMode="tail">{noteTitle || 'Meditation'}</Text>
+        {/* End button in top right */}
+        <TouchableOpacity onPress={handleEndMeditation} style={styles.endButton}>
+          <Text style={styles.endButtonText}>End</Text>
+        </TouchableOpacity>
       </View>
-      {/* Breathing animation */}
+      {/* Expanding Rings Animation */}
       <View style={styles.centerContent}>
-        <Animated.View
-          style={[
-            styles.breathingCircle,
-            { transform: [{ scale: animation }] },
-          ]}
-        />
-        <Text style={styles.instruction}>Use your breath to find energy</Text>
+        <MeditationLottie />
       </View>
+      <Text style={styles.relaxInstruction}>
+        We built this science backed custom meditation for your {selection}
+      </Text>
       {/* Audio timer/progress bar */}
       <View style={styles.bottomContent}>
         <View style={styles.progressRow}>
@@ -199,6 +297,9 @@ const MeditateScreen = () => {
           <Ionicons name={isPlaying ? 'pause' : 'play'} size={44} color="#fff" />
         </TouchableOpacity>
       </View>
+      {showDefeat && (
+        <VillainDefeatOverlay visible={showDefeat} onClose={() => setShowDefeat(false)} />
+      )}
     </SafeAreaView>
   );
 };
@@ -224,38 +325,41 @@ const styles = StyleSheet.create({
   },
   title: {
     color: ACCENT,
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     textAlign: 'center',
     flex: 1,
     marginHorizontal: 8,
-    fontFamily: 'DMSans-Bold',
-    letterSpacing: 1,
+    fontFamily: 'DMSans-Medium',
+    letterSpacing: 0.5,
+    lineHeight: 22,
   },
   centerContent: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  breathingCircle: {
+  relaxingCircle: {
     width: CIRCLE_SIZE,
     height: CIRCLE_SIZE,
     borderRadius: CIRCLE_SIZE / 2,
-    backgroundColor: ACCENT,
-    opacity: 0.18,
     marginBottom: 32,
-    shadowColor: ACCENT,
+    opacity: 0.5,
+    shadowColor: RELAX_COLORS[1],
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 32,
   },
-  instruction: {
+  relaxInstruction: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 16,
     textAlign: 'center',
     opacity: 0.9,
     fontFamily: 'DMSans-Medium',
     marginTop: 8,
+    marginBottom: 16,
+    marginHorizontal: 16,
+    lineHeight: 22,
   },
   bottomContent: {
     alignItems: 'center',
@@ -300,6 +404,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 16,
     elevation: 8,
+  },
+  endButton: {
+    backgroundColor: ACCENT,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 18,
+    marginTop: 8,
+  },
+  endButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    letterSpacing: 0.5,
   },
 });
 

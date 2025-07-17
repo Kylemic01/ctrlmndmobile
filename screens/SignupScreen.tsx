@@ -44,7 +44,7 @@ const SignupScreen = () => {
     androidClientId: 'YOUR_ANDROID_CLIENT_ID', // Replace with your Android client ID
   });
 
-  const { signUp } = useAuth();
+  const { signUp, refreshProfile } = useAuth();
 
   useEffect(() => {
     if (response?.type === 'success') {
@@ -78,7 +78,10 @@ const SignupScreen = () => {
         if (emailExists) {
             // If user exists, log them in instead of creating a new account
             Alert.alert('Welcome back!', 'You have been logged in successfully.');
-            navigation.navigate('Dashboard');
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'QuizIntro' }],
+            });
             return;
         }
 
@@ -89,7 +92,10 @@ const SignupScreen = () => {
         await AsyncStorage.setItem('users', JSON.stringify(users));
   
         Alert.alert('Success', 'Account created successfully!');
-        navigation.navigate('QuizIntro');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'QuizIntro' }],
+        });
     } catch (error) {
         console.error('Google signup error:', error);
         Alert.alert('Error', 'An error occurred during Google sign-up.');
@@ -119,8 +125,30 @@ const SignupScreen = () => {
         first_name: firstName,
         last_name: lastName
       }).eq('id', data.user.id);
-      Alert.alert('Success', 'Account created successfully!');
-      navigation.navigate('QuizIntro');
+      await refreshProfile(); // Ensure latest profile is loaded
+
+      // Insert placeholder notes for new user
+      await supabase.from('notes').insert([
+        {
+          user_id: data.user.id,
+          category: 'Goals',
+          title: 'Click me',
+          content: "When you're in the dashboard click the Plus button to start a new note, if you want to edit this one, you can delete this text and write your own. To meditate, you must click the Play button in the top right and choose your meditation."
+        },
+        {
+          user_id: data.user.id,
+          category: 'Daily Journals',
+          title: 'Tips',
+          content: "For the best meditation results journal with detail, instead of saying, I want to be the best, always give detail, I want to be the best U23 basketball player in Florida and I want to make the State championship. etc. More detail will improve your meditation script"
+        }
+      ]);
+
+      Alert.alert('Success', 'Account created! Please check your email to verify your account.');
+      // Navigate to MainTabs - AppNavigator will handle quiz completion check
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Sign up failed.');
       console.error(error);

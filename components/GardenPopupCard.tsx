@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, Modal, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
 const gardenImages = [
   require('../assets/gardens/garden1.webp'),
@@ -61,6 +62,7 @@ const GardenPopupCard: React.FC<GardenPopupCardProps> = ({ visible, streak, onCo
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.card}>
+          <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
           {/* X Button */}
           <TouchableOpacity style={styles.closeButton} onPress={onContinue}>
             <Ionicons name="close" size={28} color="#fff" />
@@ -88,7 +90,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 28,
+    borderRadius: 32,
     padding: 0,
     width: 360,
     alignItems: 'center',
